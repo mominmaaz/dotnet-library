@@ -16,7 +16,7 @@ env:
   LINE_COVERAGE_TARGETS: '0,0,0'
   CONDITIONAL_COVERAGE_TARGETS: '0,0,0'
   DEV_STREAM: core
-  DEVELOPERS: 'maaz.momin@lisec.com,marko.mocnik@lisec.com,nitish.unvi@lisec.com'
+  DEVELOPERS: 'qtlisec.maaz@gmail.com'
 jobs:
   build:
     container:
