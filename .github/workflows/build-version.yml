@@ -19,6 +19,7 @@ env:
   DEVELOPERS: 'qtlisec.maaz@gmail.com'
 jobs:
   build:
+    runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/dotnet/aspnet:8.0-alpine3.21
     steps:
