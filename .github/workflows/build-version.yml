@@ -1,0 +1,132 @@
+name: Build and Version
+
+on:
+  push:
+    branches:
+      - main
+      - 'release-*'
+  pull_request:
+    branches: [ '**' ]
+
+env:
+  PACKAGENAME_CAMELCASE: ValidationAttributes
+  EMBOLD_REPO_UID: 89b998ec50ea427bf32d136f77048340
+  CLASS_COVERAGE_TARGETS: '0,0,0'
+  METHOD_COVERAGE_TARGETS: '0,0,0'
+  LINE_COVERAGE_TARGETS: '0,0,0'
+  CONDITIONAL_COVERAGE_TARGETS: '0,0,0'
+  DEV_STREAM: core
+  DEVELOPERS: 'maaz.momin@lisec.com,marko.mocnik@lisec.com,nitish.unvi@lisec.com'
+jobs:
+  build:
+    container:
+      image: mcr.microsoft.com/dotnet/aspnet:8.0-alpine3.21
+    steps:
+      - name: Install bash and icu-libs
+        run: apk update && apk add bash icu-libs
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: /root/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+      - name: Install bash and icu-libs
+        run: apk update && apk add bash icu-libs
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Set MinVerBuildMetadata
+        run: echo "MinVerBuildMetadata=${GITHUB_RUN_ID}" >> $GITHUB_ENV
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build *.Library -c Release --no-restore -o output
+
+      - name: Test
+        run: |
+          dotnet test *.Test -c Release --no-build --settings coverlet.runsettings --logger "trx;LogFileName=unit_tests.xml" --collect:"XPlat Code Coverage" -o output || echo "There were failing tests!"
+
+      - name: Read Jenkins-env.groovy and export coverage targets
+        run: |
+          export CLASS_COVERAGE_TARGETS=$(grep classCoverageTargets Jenkins-env.groovy | cut -d"'" -f2)
+          export METHOD_COVERAGE_TARGETS=$(grep methodCoverageTargets Jenkins-env.groovy | cut -d"'" -f2)
+          export LINE_COVERAGE_TARGETS=$(grep lineCoverageTargets Jenkins-env.groovy | cut -d"'" -f2)
+          export CONDITIONAL_COVERAGE_TARGETS=$(grep conditionalCoverageTargets Jenkins-env.groovy | cut -d"'" -f2)
+          echo "CLASS_COVERAGE_TARGETS=$CLASS_COVERAGE_TARGETS" >> $GITHUB_ENV
+          echo "METHOD_COVERAGE_TARGETS=$METHOD_COVERAGE_TARGETS" >> $GITHUB_ENV
+          echo "LINE_COVERAGE_TARGETS=$LINE_COVERAGE_TARGETS" >> $GITHUB_ENV
+          echo "CONDITIONAL_COVERAGE_TARGETS=$CONDITIONAL_COVERAGE_TARGETS" >> $GITHUB_ENV
+
+      - name: Enforce code coverage targets
+        run: |
+          # Extract line and branch (conditional) coverage from cobertura XML
+          LINE_COVERAGE=$(grep -oP '<coverage line-rate="\K[0-9.]+' output/coverage.cobertura.xml | head -1)
+          BRANCH_COVERAGE=$(grep -oP '<coverage branch-rate="\K[0-9.]+' output/coverage.cobertura.xml | head -1)
+          CLASS_COVERAGE=0 # TODO: Add extraction logic if needed
+
+          LINE_TARGET=$(echo "$LINE_COVERAGE_TARGETS" | cut -d, -f1)
+          CONDITIONAL_TARGET=$(echo "$CONDITIONAL_COVERAGE_TARGETS" | cut -d, -f1)
+          CLASS_TARGET=$(echo "$CLASS_COVERAGE_TARGETS" | cut -d, -f1)
+
+          echo "Line coverage: $LINE_COVERAGE, Target: $LINE_TARGET"
+          echo "Branch/Conditional coverage: $BRANCH_COVERAGE, Target: $CONDITIONAL_TARGET"
+          echo "Class coverage: $CLASS_COVERAGE, Target: $CLASS_TARGET"
+
+          FAIL=0
+          if [ $(echo "$LINE_COVERAGE < $LINE_TARGET" | bc) -eq 1 ]; then FAIL=1; fi
+          if [ $(echo "$BRANCH_COVERAGE < $CONDITIONAL_TARGET" | bc) -eq 1 ]; then FAIL=1; fi
+          if [ $(echo "$CLASS_COVERAGE < $CLASS_TARGET" | bc) -eq 1 ]; then FAIL=1; fi
+          if [ $FAIL -eq 1 ]; then
+            echo "Code coverage below target!" && exit 1
+          fi
+
+      - name: Determine version with MinVer
+        id: minver
+        run: |
+          VERSION=$(dotnet minver -t v -d)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+      - name: Pack NuGet package
+        run: dotnet pack *.Library -c Release -o output
+
+      - name: Publish NuGet package to GitHub Packages
+        if: startsWith(github.ref, 'refs/heads/release-')
+        run: dotnet nuget push output/*.nupkg --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" --api-key ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: output/unit_tests.xml
+
+      - name: Upload coverage results
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-results
+          path: output/**/coverage.*
+
+      - name: Set version for main branch (hybrid)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "Hybrid version: ${{ steps.minver.outputs.version }}"
+
+      - name: Set version for release branch (semantic)
+        if: startsWith(github.ref, 'refs/heads/release-')
+        run: |
+          echo "Release version: ${{ steps.minver.outputs.version }}"
+
+      - name: Tag release branch
+        if: startsWith(github.ref, 'refs/heads/release-')
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag ${{ steps.minver.outputs.version }}
+          git push origin ${{ steps.minver.outputs.version }}
