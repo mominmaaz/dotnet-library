@@ -15,7 +15,6 @@ env:
   METHOD_COVERAGE_TARGETS: '0,0,0'
   LINE_COVERAGE_TARGETS: '0,0,0'
   CONDITIONAL_COVERAGE_TARGETS: '0,0,0'
-  DEV_STREAM: core
   DEVELOPERS: 'qtlisec.maaz@gmail.com'
 jobs:
   build:
@@ -23,8 +22,8 @@ jobs:
     container:
       image: mcr.microsoft.com/dotnet/aspnet:8.0-alpine3.21
     steps:
-      - name: Install bash and icu-libs
-        run: apk update && apk add bash icu-libs
+      - name: Install bash, icu-libs, and git
+        run: apk update && apk add bash icu-libs git
 
       - name: Cache NuGet packages
         uses: actions/cache@v4
