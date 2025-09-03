@@ -48,20 +48,20 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore
 
-      - name: Build
-        run: dotnet build *.Library -c Release --no-restore -o output
-
-      - name: Test
-        run: |
-          dotnet test *.Test -c Release --no-build --settings coverlet.runsettings --logger "trx;LogFileName=unit_tests.xml" --collect:"XPlat Code Coverage" -o output || echo "There were failing tests!"
-
       - name: Determine version with MinVer
         id: minver
         run: |
           dotnet tool install --global minver-cli
           export PATH="$PATH:$HOME/.dotnet/tools"
-          VERSION="0.0.0-alpha.${GITHUB_RUN_NUMBER}"
+          VERSION=$(minver -t v -d . --build-metadata $GITHUB_RUN_NUMBER)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build
+        run: dotnet build *.Library -c Release --no-restore -o output /p:Version=${{ steps.minver.outputs.version }}
+
+      - name: Test
+        run: |
+          dotnet test *.Test -c Release --no-build --settings coverlet.runsettings --logger "trx;LogFileName=unit_tests.xml" --collect:"XPlat Code Coverage" -o output /p:Version=${{ steps.minver.outputs.version }} || echo "There were failing tests!"
 
       - name: Pack NuGet package
         run: dotnet pack *.Library -c Release -o output /p:Version=${{ steps.minver.outputs.version }}
