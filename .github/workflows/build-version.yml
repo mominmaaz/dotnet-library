@@ -10,14 +10,15 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write # Required to push packages to GitHub Packages
-  packages: write # Required to publish packages
-  id-token: write # Required for authentication with GitHub Packages
-  actions: read # Required for actions to run
+  contents: write
+  packages: write
+  id-token: write
+  actions: read
 
 env:
   PACKAGENAME_CAMELCASE: ValidationAttributes
   DEVELOPERS: 'qtlisec.maaz@gmail.com'
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -34,6 +35,7 @@ jobs:
           key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
           restore-keys: |
             ${{ runner.os }}-nuget-
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -44,33 +46,32 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Set MinVerBuildMetadata
-        run: echo "MinVerBuildMetadata=${GITHUB_RUN_ID}" >> $GITHUB_ENV
+      # Use MinVer GitHub Action to determine version
+      - id: minver
+        uses: thefringeninja/action-minver@2.0.0-preview1
+        with:
+          build-metadata: build.${{ github.run_number }}
+          tag-prefix: v
+          verbosity: trace
+
+      # Set version output for later steps
+      - id: set-version
+        run: |
+          VERSION="${{ steps.minver.outputs.version }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Restore dependencies
         run: dotnet restore
 
-      - name: Determine version with MinVer
-        id: minver
-        run: |
-          dotnet tool install --global minver-cli
-          export PATH="$PATH:$HOME/.dotnet/tools"
-          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
-            VERSION="0.0.0-alpha.${GITHUB_RUN_NUMBER}"
-          else
-            VERSION=$(minver -t v -d . --default-pre-release-identifiers alpha.0 --build-metadata $GITHUB_RUN_NUMBER)
-          fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
       - name: Build
-        run: dotnet build *.Library -c Release --no-restore -o output /p:Version=${{ steps.minver.outputs.version }}
+        run: dotnet build *.Library -c Release --no-restore -o output /p:Version=${{ steps.set-version.outputs.version }}
 
       - name: Test
         run: |
-          dotnet test *.Test -c Release --no-build --settings coverlet.runsettings --logger "trx;LogFileName=unit_tests.xml" --collect:"XPlat Code Coverage" -o output /p:Version=${{ steps.minver.outputs.version }} || echo "There were failing tests!"
+          dotnet test *.Test -c Release --no-build --settings coverlet.runsettings --logger "trx;LogFileName=unit_tests.xml" --collect:"XPlat Code Coverage" -o output /p:Version=${{ steps.set-version.outputs.version }} || echo "There were failing tests!"
 
       - name: Pack NuGet package
-        run: dotnet pack *.Library -c Release -o output /p:Version=${{ steps.minver.outputs.version }}
+        run: dotnet pack *.Library -c Release -o output /p:Version=${{ steps.set-version.outputs.version }}
 
       - name: Publish NuGet package to GitHub Packages
         if: startsWith(github.ref, 'refs/heads/release-') || github.ref == 'refs/heads/main'
@@ -88,20 +89,14 @@ jobs:
           name: coverage-results
           path: output/**/coverage.*
 
-      - name: Set version for main branch (hybrid)
-        if: github.ref == 'refs/heads/main'
+      - name: Print version info
         run: |
-          echo "Hybrid version: ${{ steps.minver.outputs.version }}"
-
-      - name: Set version for release branch (semantic)
-        if: startsWith(github.ref, 'refs/heads/release-')
-        run: |
-          echo "Release version: ${{ steps.minver.outputs.version }}"
+          echo "Library version: ${{ steps.set-version.outputs.version }}"
 
       - name: Tag release branch
         if: startsWith(github.ref, 'refs/heads/release-')
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git tag ${{ steps.minver.outputs.version }}
-          git push origin ${{ steps.minver.outputs.version }}
+          git tag ${{ steps.set-version.outputs.version }}
+          git push origin ${{ steps.set-version.outputs.version }}
