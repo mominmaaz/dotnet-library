@@ -60,11 +60,11 @@ jobs:
         run: |
           dotnet tool install --global minver-cli
           export PATH="$PATH:$HOME/.dotnet/tools"
-          VERSION=$(minver -t v -d . --build-metadata $GITHUB_RUN_NUMBER)
+          VERSION="0.0.0-alpha.${GITHUB_RUN_NUMBER}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Pack NuGet package
-        run: dotnet pack *.Library -c Release -o output
+        run: dotnet pack *.Library -c Release -o output /p:Version=${{ steps.minver.outputs.version }}
 
       - name: Publish NuGet package to GitHub Packages
         if: startsWith(github.ref, 'refs/heads/release-') || github.ref == 'refs/heads/main'
