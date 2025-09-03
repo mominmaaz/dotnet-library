@@ -16,7 +16,7 @@ permissions:
   actions: read
 
 env:
-  PACKAGENAME_CAMELCASE: ValidationAttributes
+  PACKAGENAME_CAMELCASE: DotNetLibrary
   DEVELOPERS: 'qtlisec.maaz@gmail.com'
 
 jobs:
