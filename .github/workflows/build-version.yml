@@ -36,6 +36,8 @@ jobs:
             ${{ runner.os }}-nuget-
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -53,7 +55,11 @@ jobs:
         run: |
           dotnet tool install --global minver-cli
           export PATH="$PATH:$HOME/.dotnet/tools"
-          VERSION=$(minver -t v -d . --build-metadata $GITHUB_RUN_NUMBER)
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            VERSION="0.0.0-alpha.${GITHUB_RUN_NUMBER}"
+          else
+            VERSION=$(minver -t v -d . --default-pre-release-identifiers alpha.0 --build-metadata $GITHUB_RUN_NUMBER)
+          fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Build
