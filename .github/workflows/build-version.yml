@@ -7,6 +7,13 @@ on:
       - 'release-*'
   pull_request:
     branches: [ '**' ]
+  workflow_dispatch:
+
+permissions:
+  contents: write # Required to push packages to GitHub Packages
+  packages: write # Required to publish packages
+  id-token: write # Required for authentication with GitHub Packages
+  actions: read # Required for actions to run
 
 env:
   PACKAGENAME_CAMELCASE: ValidationAttributes
