@@ -60,6 +60,14 @@ jobs:
           VERSION="${{ steps.minver.outputs.version }}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            echo "version=0.0.0-alpha.${GITHUB_RUN_NUMBER}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${{ steps.minver.outputs.version }}" >> $GITHUB_OUTPUT
+
       - name: Restore dependencies
         run: dotnet restore
 
@@ -70,14 +78,13 @@ jobs:
         run: ls -la .git
 
       - name: Build
-        run: dotnet build DotNetLibrary.Library/DotNetLibrary.Library.csproj -c Release --no-restore -o output /p:Version=${{ steps.set-version.outputs.version }}
+        run: dotnet build DotNetLibrary.Library/DotNetLibrary.Library.csproj -c Release --no-restore -o output /p:Version=${{ steps.version.outputs.version }}
 
       - name: Test
-        run: |
-          dotnet test *.Test -c Release --no-build --settings coverlet.runsettings --logger "trx;LogFileName=unit_tests.xml" --collect:"XPlat Code Coverage" -o output /p:Version=${{ steps.set-version.outputs.version }} || echo "There were failing tests!"
+        run: dotnet test *.Test -c Release --no-build --settings coverlet.runsettings --logger "trx;LogFileName=unit_tests.xml" --collect:"XPlat Code Coverage" -o output /p:Version=${{ steps.version.outputs.version }} || echo "There were failing tests!"
 
       - name: Pack NuGet package
-        run: dotnet pack *.Library -c Release -o output /p:PackageId=${PACKAGENAME_CAMELCASE} /p:Version=${{ steps.set-version.outputs.version }}
+        run: dotnet pack *.Library -c Release -o output /p:PackageId=${PACKAGENAME_CAMELCASE} /p:Version=${{ steps.version.outputs.version }}
 
       - name: Publish NuGet package to GitHub Packages
         if: startsWith(github.ref, 'refs/heads/release-') || github.ref == 'refs/heads/main'
