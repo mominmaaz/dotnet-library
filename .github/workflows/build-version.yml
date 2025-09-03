@@ -60,7 +60,7 @@ jobs:
         run: |
           dotnet tool install --global minver-cli
           export PATH="$PATH:$HOME/.dotnet/tools"
-          VERSION=$(minver -t v -d .)
+          VERSION=$(minver -t v -d . --build-metadata $GITHUB_RUN_NUMBER)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Pack NuGet package
