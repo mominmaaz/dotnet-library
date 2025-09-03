@@ -67,7 +67,7 @@ jobs:
         run: dotnet pack *.Library -c Release -o output
 
       - name: Publish NuGet package to GitHub Packages
-        if: startsWith(github.ref, 'refs/heads/release-')
+        if: startsWith(github.ref, 'refs/heads/release-') || github.ref == 'refs/heads/main'
         run: dotnet nuget push output/*.nupkg --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" --api-key ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload test results
