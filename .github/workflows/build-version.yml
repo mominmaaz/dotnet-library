@@ -52,7 +52,7 @@ jobs:
         id: minver
         run: |
           dotnet tool install --global minver-cli
-          echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+          export PATH="$PATH:$HOME/.dotnet/tools"
           VERSION=$(minver -t v -d)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
