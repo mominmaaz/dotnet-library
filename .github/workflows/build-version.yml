@@ -71,7 +71,7 @@ jobs:
           dotnet test *.Test -c Release --no-build --settings coverlet.runsettings --logger "trx;LogFileName=unit_tests.xml" --collect:"XPlat Code Coverage" -o output /p:Version=${{ steps.set-version.outputs.version }} || echo "There were failing tests!"
 
       - name: Pack NuGet package
-        run: dotnet pack *.Library -c Release -o output /p:Version=${{ steps.set-version.outputs.version }}
+        run: dotnet pack *.Library -c Release -o output /p:PackageId=${PACKAGENAME_CAMELCASE} /p:Version=${{ steps.set-version.outputs.version }}
 
       - name: Publish NuGet package to GitHub Packages
         if: startsWith(github.ref, 'refs/heads/release-') || github.ref == 'refs/heads/main'
