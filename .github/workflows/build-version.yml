@@ -63,6 +63,12 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore
 
+      - name: Mark repo as safe for Git
+        run: git config --global --add safe.directory /__w/dotnet-library/dotnet-library
+
+      - name: List .git directory
+        run: ls -la .git
+
       - name: Build
         run: dotnet build DotNetLibrary.Library/DotNetLibrary.Library.csproj -c Release --no-restore -o output /p:Version=${{ steps.set-version.outputs.version }}
         working-directory: ${{ github.workspace }}
@@ -101,6 +107,3 @@ jobs:
           git config user.email "github-actions@github.com"
           git tag ${{ steps.set-version.outputs.version }}
           git push origin ${{ steps.set-version.outputs.version }}
-
-      - name: List .git directory
-        run: ls -la .git
